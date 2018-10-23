@@ -36,6 +36,8 @@ public class MainActivity extends Activity implements View.OnClickListener{
     private TextView cityTv, timeTv, humidityTv, weekTv, pmDataTv, pmQualityTv, temperatureTv, climateTv, windTv, city_name_Tv;
     private ImageView weatherImg, pmImg;
 
+    private String CodeCity="101010100",CityName = "";   //想办法通过SharedPreferences存储起来
+
     private Handler mHandler = new Handler(){
         public void handleMessage(android.os.Message msg){
             switch (msg.what){
@@ -61,16 +63,21 @@ public class MainActivity extends Activity implements View.OnClickListener{
         climateTv = (TextView) findViewById(R.id.climate);
         windTv = (TextView) findViewById(R.id.wind);
         weatherImg = (ImageView) findViewById(R.id.weather_img);
-        city_name_Tv.setText("N/A");
-        cityTv.setText("N/A");
-        timeTv.setText("N/A");
-        humidityTv.setText("N/A");
-        pmDataTv.setText("N/A");
-        pmQualityTv.setText("N/A");
-        weekTv.setText("N/A");
-        temperatureTv.setText("N/A");
-        climateTv.setText("N/A");
-        windTv.setText("N/A");
+//        city_name_Tv.setText("N/A");
+//        cityTv.setText("N/A");
+//        timeTv.setText("N/A");
+//        humidityTv.setText("N/A");
+//        pmDataTv.setText("N/A");
+//        pmQualityTv.setText("N/A");
+//        weekTv.setText("N/A");
+//        temperatureTv.setText("N/A");
+//        climateTv.setText("N/A");
+//        windTv.setText("N/A");
+        SharedPreferences sharedPreferences = getSharedPreferences("recently_info", MODE_PRIVATE);
+        //getString()第二个参数为缺省值，如果preference中不存在该key，将返回缺省值
+        CodeCity = sharedPreferences.getString("CodeCity", "101010100");
+        CityName = sharedPreferences.getString("CityName", "北京");
+        queryWeatherCode(CodeCity);
     }
 
 
@@ -278,6 +285,7 @@ public class MainActivity extends Activity implements View.OnClickListener{
 
         if(view.getId() == R.id.title_city_manager){
             Intent i = new Intent(this, SelectCity.class);
+            i.putExtra("CityName",CityName);
             //startActivity(i);
             startActivityForResult(i,1);
         }
@@ -285,9 +293,8 @@ public class MainActivity extends Activity implements View.OnClickListener{
 
         if(view.getId() == R.id.title_update_btn){
             SharedPreferences sharedPreferences = getSharedPreferences("config",MODE_PRIVATE);
-            String cityCode = sharedPreferences.getString("main_city_code","101010100");
+            String cityCode = sharedPreferences.getString("main_city_code",CodeCity);
             Log.d("myWeather",cityCode);
-
 
             if(NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE){
                 Log.d("myWeather","网络ok");
@@ -299,19 +306,35 @@ public class MainActivity extends Activity implements View.OnClickListener{
         }
     }
 
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == 1 && resultCode == RESULT_OK) {
             String newCityCode= data.getStringExtra("cityCode");
+            String newCityName= data.getStringExtra("cityName");
             Log.d("myWeather", "选择的城市代码为"+newCityCode);
 
-        if (NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE) {
+            if (NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE) {
             Log.d("myWeather", "网络OK");
             queryWeatherCode(newCityCode);
-        }else{
+            }else{
             Log.d("myWeather", "网络挂了");
             Toast.makeText(MainActivity.this, "网络挂了！", Toast.LENGTH_LONG).show();
+            }
+
+            //改变城市代码的值
+            CodeCity = newCityCode;
+            CityName = newCityName;
+            //获取sharedPreferences对象
+            SharedPreferences sharedPreferences = getSharedPreferences("recently_info", MODE_PRIVATE);
+            //获取editor对象
+            SharedPreferences.Editor editor = sharedPreferences.edit();//获取编辑器
+            //存储键值对
+            editor.putString("CityName",CityName);
+            editor.putString("CodeCity",CodeCity);
+            //提交
+            editor.commit();//提交修改
+
         }
-    }
     }
 
 
