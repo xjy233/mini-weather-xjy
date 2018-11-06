@@ -6,9 +6,11 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,6 +31,8 @@ import java.net.URL;
 
 public class MainActivity extends Activity implements View.OnClickListener{
     private static final int UPDATE_TODAY_WEATHER = 1;
+    private static final int UPDATE_Visibility_ProgressBar = 2;
+    private static final int UPDATE_Visibility_UpdateBtn = 3;
     private ImageView mUpdateBtn;
 
     private ImageView mCitySelect;
@@ -36,13 +40,31 @@ public class MainActivity extends Activity implements View.OnClickListener{
     private TextView cityTv, timeTv, humidityTv, weekTv, pmDataTv, pmQualityTv, temperatureTv, climateTv, windTv, city_name_Tv;
     private ImageView weatherImg, pmImg;
 
+    private ProgressBar mprogressBar;
+
     private String CodeCity="101010100",CityName = "";   //想办法通过SharedPreferences存储起来
 
     private Handler mHandler = new Handler(){
         public void handleMessage(android.os.Message msg){
+            int isvisibility;
             switch (msg.what){
                 case UPDATE_TODAY_WEATHER:
                     updateTodayWeather((TodayWeather) msg.obj);
+                    break;
+                case UPDATE_Visibility_ProgressBar:
+                    isvisibility = (int)msg.obj;
+                    if(isvisibility == 1){
+                        mprogressBar.setVisibility(View.VISIBLE);
+                    }else{
+                        mprogressBar.setVisibility(View.INVISIBLE);
+                    }
+                case UPDATE_Visibility_UpdateBtn:
+                    isvisibility = (int)msg.obj;
+                    if(isvisibility == 1){
+                        mUpdateBtn.setVisibility(View.VISIBLE);
+                    }else{
+                        mUpdateBtn.setVisibility(View.INVISIBLE);
+                    }
                     break;
                 default:
                     break;
@@ -63,21 +85,17 @@ public class MainActivity extends Activity implements View.OnClickListener{
         climateTv = (TextView) findViewById(R.id.climate);
         windTv = (TextView) findViewById(R.id.wind);
         weatherImg = (ImageView) findViewById(R.id.weather_img);
-//        city_name_Tv.setText("N/A");
-//        cityTv.setText("N/A");
-//        timeTv.setText("N/A");
-//        humidityTv.setText("N/A");
-//        pmDataTv.setText("N/A");
-//        pmQualityTv.setText("N/A");
-//        weekTv.setText("N/A");
-//        temperatureTv.setText("N/A");
-//        climateTv.setText("N/A");
-//        windTv.setText("N/A");
+        mprogressBar = (ProgressBar)findViewById(R.id.progressBar);
+        mUpdateBtn = (ImageView)findViewById(R.id.title_update_btn);
+
         SharedPreferences sharedPreferences = getSharedPreferences("recently_info", MODE_PRIVATE);
         //getString()第二个参数为缺省值，如果preference中不存在该key，将返回缺省值
         CodeCity = sharedPreferences.getString("CodeCity", "101010100");
         CityName = sharedPreferences.getString("CityName", "北京");
         queryWeatherCode(CodeCity);
+
+        mprogressBar.setVisibility(View.INVISIBLE);  //初始进度条控件不可见
+        mUpdateBtn.setVisibility(View.INVISIBLE);
     }
 
 
@@ -101,7 +119,40 @@ public class MainActivity extends Activity implements View.OnClickListener{
         mCitySelect.setOnClickListener(this);
 
         initView();
+
     }
+
+    //输入：butn_name：（ProgressBar或者UpdateBtn），isVisibility：//1可见，0不可见
+    private void hidden_image(final String butn_name,final int isVisibility){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try{
+                    Message msg =new Message();
+                    if (butn_name.equals("ProgressBar")){
+                        msg.what = UPDATE_Visibility_ProgressBar;
+                        if(isVisibility == 1){
+                            msg.obj=1;
+                        }else{
+                            msg.obj=0;
+                        }
+                    }else if (butn_name.equals("UpdateBtn")){
+                        msg.what = UPDATE_Visibility_UpdateBtn;
+                        if(isVisibility == 1){
+                            msg.obj=1;
+                        }else{
+                            msg.obj=0;
+                        }
+                    }
+
+                    mHandler.sendMessage(msg);
+                }catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+
 
     private void queryWeatherCode(String cityCode){
         final String address = "http://wthrcdn.etouch.cn/WeatherApi?citykey="+cityCode;
@@ -112,6 +163,11 @@ public class MainActivity extends Activity implements View.OnClickListener{
                 HttpURLConnection con = null;
                 TodayWeather todayWeather = null;
                 try{
+//                    mprogressBar.setVisibility(View.VISIBLE);
+//                    mUpdateBtn.setVisibility(View.INVISIBLE);
+                    hidden_image("ProgressBar",1);
+                    hidden_image("UpdateBtn",0);
+                    Thread.sleep(4000);  //线程睡眠4S，主要是为了显示动画
                     URL url = new URL(address);
                     con = (HttpURLConnection)url.openConnection();
                     con.setRequestMethod("GET");
@@ -136,7 +192,10 @@ public class MainActivity extends Activity implements View.OnClickListener{
                         msg.obj=todayWeather;
                         mHandler.sendMessage(msg);
                     }
-
+//                    mprogressBar.setVisibility(View.INVISIBLE);  //因为在子线程中所以ui操作并不会执行，应该通过下面调用消息机制
+//                    mUpdateBtn.setVisibility(View.VISIBLE);
+                    hidden_image("ProgressBar",0);
+                    hidden_image("UpdateBtn",1);
                 }catch (Exception e){
                     e.printStackTrace();
                 }finally {
@@ -295,10 +354,23 @@ public class MainActivity extends Activity implements View.OnClickListener{
             SharedPreferences sharedPreferences = getSharedPreferences("config",MODE_PRIVATE);
             String cityCode = sharedPreferences.getString("main_city_code",CodeCity);
             Log.d("myWeather",cityCode);
+            //点击更新按钮之后原更新按钮不可见，进度条可见，注意下面两种方法是错误的，如果是用直接用前一二行会直接执行，因为时间太短了，看不到动画效果，而三四句会造成开的
+            //线程过多，5个线程在一起会造成错乱，谁先谁后随机，所以应该把它们全放在queryWeatherCode线程里保持同步
+//            mprogressBar.setVisibility(View.VISIBLE);
+//            mUpdateBtn.setVisibility(View.INVISIBLE);
+//            hidden_image("ProgressBar",1);
+//            hidden_image("UpdateBtn",0);
+
+//            SystemClock.sleep(5000);  //整个系统睡眠，这里是错误的，应该放在线程里，使线程睡眠
 
             if(NetUtil.getNetworkState(this) != NetUtil.NETWORN_NONE){
                 Log.d("myWeather","网络ok");
                 queryWeatherCode(cityCode);
+//                mprogressBar.clearAnimation();
+//                mprogressBar.setVisibility(View.INVISIBLE);
+//                mUpdateBtn.setVisibility(View.VISIBLE);
+//                hidden_image("ProgressBar",0);
+//                hidden_image("UpdateBtn",1);
             }else {
                 Log.d("myWeather","网络挂了");
                 Toast.makeText(MainActivity.this, "网络挂了", Toast.LENGTH_SHORT).show();
