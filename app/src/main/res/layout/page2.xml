@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/page1">
+
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="114dp"
+        android:layout_height="157dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="26dp"
+        android:textSize="22sp"
+        android:text="感谢测试，有什么bug请告诉我，谢谢   --by  red_panda" />
+</RelativeLayout>
